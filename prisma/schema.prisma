@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum InvitationStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PUBLISHED
+  EXPIRED
+  ARCHIVED
+}
+
+enum SourceType {
+  TEMPLATE
+  UPLOADED_FLYER
+  SCRATCH
+}
+
+enum Attendance {
+  ATTENDING
+  MAYBE
+  NOT_ATTENDING
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum ContentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         Role       @default(USER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  invitations  Invitation[]
+  orders       Order[]
+  favorites    Favorite[]
+}
+
+model Template {
+  id            String   @id @default(cuid())
+  name          String
+  category      String
+  style         String?
+  description   String?
+  preview       String?
+  configuration Json
+  tags          Json     @default("[]")
+  priceTier     String   @default("BASIC")
+  isPremium     Boolean  @default(false)
+  priceKobo     Int?
+  featured      Boolean  @default(false)
+  status        ContentStatus @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  invitations   Invitation[]
+  favorites     Favorite[]
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  templateId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  @@unique([userId, templateId])
+}
+
+model Invitation {
+  id               String   @id @default(cuid())
+  userId           String
+  templateId       String?
+  sourceType       SourceType @default(TEMPLATE)
+  originalFlyerUrl String?
+  slug             String?  @unique
+  eventType        String
+  eventTitle       String
+  hostName         String
+  date             DateTime?
+  startTime        String?
+  endTime          String?
+  venue            String?
+  address          String?
+  mapUrl           String?
+  description      String?
+  personalMessage  Json?
+  dressCode        Json?
+  hashtag          String?
+  photos           Json     @default("{}")
+  theme            Json     @default("{}")
+  music            String?
+  rsvpEnabled      Boolean  @default(false)
+  packageId        String?
+  status           InvitationStatus @default(DRAFT)
+  views            Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  publishedAt      DateTime?
+  user             User     @relation(fields: [userId], references: [id])
+  template         Template? @relation(fields: [templateId], references: [id])
+  rsvps            Rsvp[]
+  orders           Order[]
+  events           AnalyticsEvent[]
+  programme        ProgrammeItem[]
+  contacts         InvitationContact[]
+  faqs             Faq[]
+}
+
+model ProgrammeItem {
+  id           String  @id @default(cuid())
+  invitationId String
+  time         String?
+  title        String
+  description  String?
+  sortOrder    Int     @default(0)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model InvitationContact {
+  id           String  @id @default(cuid())
+  invitationId String
+  role         String
+  name         String
+  phone        String?
+  whatsapp     String?
+  sortOrder    Int     @default(0)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model Faq {
+  id           String  @id @default(cuid())
+  invitationId String
+  question     String
+  answer       String
+  sortOrder    Int     @default(0)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model Rsvp {
+  id           String   @id @default(cuid())
+  invitationId String
+  name         String
+  phone        String?
+  email        String?
+  guests       Int      @default(1)
+  attendance   Attendance
+  message      String?
+  meta         Json?
+  createdAt    DateTime @default(now())
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model Package {
+  id       String  @id
+  name     String
+  priceKobo Int?
+  features Json
+  isQuote  Boolean @default(false)
+  status   ContentStatus @default(ACTIVE)
+}
+
+model Order {
+  id               String   @id @default(cuid())
+  userId           String
+  invitationId     String?
+  packageId        String
+  amountKobo       Int
+  status           OrderStatus @default(PENDING)
+  paymentReference String   @unique
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id])
+  invitation       Invitation? @relation(fields: [invitationId], references: [id])
+}
+
+model Product {
+  id          String @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  priceKobo   Int
+  previewUrl  String?
+  fileUrl     String?
+  status      ContentStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+}
+
+model Service {
+  id          String @id @default(cuid())
+  name        String
+  description String
+  icon        String?
+  features    Json
+  ctaLabel    String
+  ctaHref     String
+  sortOrder   Int    @default(0)
+  status      ContentStatus @default(ACTIVE)
+}
+
+model PortfolioItem {
+  id          String @id @default(cuid())
+  name        String
+  category    String
+  description String
+  imageUrl    String?
+  projectUrl  String?
+  published   Boolean @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Coupon {
+  id       String @id @default(cuid())
+  code     String @unique
+  percentOff Int
+  active   Boolean @default(true)
+  expiresAt DateTime?
+}
+
+model AnalyticsEvent {
+  id           String   @id @default(cuid())
+  invitationId String
+  type         String
+  visitorId    String?
+  createdAt    DateTime @default(now())
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  @@index([invitationId, type])
+}
+
+model Setting {
+  key   String @id
+  value Json
+}
